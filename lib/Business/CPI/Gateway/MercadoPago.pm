@@ -19,7 +19,7 @@ has '+checkout_url' =>
 
 has '+currency' => ( default => sub { 'BRL' } );
 
-has base_url => (
+has _base_url => (
     is      => 'ro',
     default => sub { 'https://api.mercadolibre.com' },
 );
@@ -29,7 +29,7 @@ has [ 'token', 'back_url' ] => (
     required => 1
 );
 
-has user_agent_name => (
+has _user_agent_name => (
     is      => 'ro',
     default => sub {
         my $base    = 'Business::CPI::Gateway::MercadoPago';
@@ -44,7 +44,7 @@ has user_agent => (
         my $self = shift;
 
         my $ua = LWP::UserAgent->new();
-        $ua->agent( $self->user_agent_name );
+        $ua->agent( $self->_user_agent_name );
         $ua->default_header( 'Accept'       => 'application/json' );
         $ua->default_header( 'Content-Type' => 'application/json' );
 
@@ -89,7 +89,7 @@ sub _builder_access_token {
 
 sub _build_uri {
     my ( $self, $path, $info ) = @_;
-    my $uri = URI->new( $self->base_url . $path );
+    my $uri = URI->new( $self->_base_url . $path );
     return $uri->as_string;
 }
 
