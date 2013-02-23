@@ -13,21 +13,19 @@ extends 'Business::CPI::Gateway::Base';
 
 # VERSION
 
-has '+checkout_url' => ( 
-	default => sub { 'https://pagseguro.uol.com.br/v2/checkout/payment.html' },
-);
+has '+checkout_url' =>
+  ( default => sub { 'https://pagseguro.uol.com.br/v2/checkout/payment.html' },
+  );
 
-has '+currency' => ( 
-	default => sub { 'BRL' }
-);
+has '+currency' => ( default => sub { 'BRL' } );
 
 has base_url => (
     is      => 'ro',
     default => sub { 'https://api.mercadolibre.com' },
 );
 
-has ['token', 'back_url'] => ( 
-    is => 'ro',
+has [ 'token', 'back_url' ] => (
+    is       => 'ro',
     required => 1
 );
 
@@ -47,102 +45,107 @@ has user_agent => (
 
         my $ua = LWP::UserAgent->new();
         $ua->agent( $self->user_agent_name );
-        $ua->default_header('Accept' => 'application/json');
-        $ua->default_header('Content-Type' => 'application/json');
+        $ua->default_header( 'Accept'       => 'application/json' );
+        $ua->default_header( 'Content-Type' => 'application/json' );
 
         return $ua;
     },
 );
 
 has access_token => (
-    is      => 'ro',
+    is       => 'ro',
     init_arg => undef,
-    lazy    => 1,
-    builder => '_builder_access_token'
+    lazy     => 1,
+    builder  => '_builder_access_token'
 );
 
 sub _builder_access_token {
     my $self     = shift;
     my $auth_url = $self->_build_uri('/oauth/token');
 
-    my $ua   = $self->user_agent;
+    my $ua = $self->user_agent;
 
-	$ua->default_header('Content-Type' => 'application/x-www-form-urlencoded');
+    $ua->default_header(
+        'Content-Type' => 'application/x-www-form-urlencoded' );
 
-    my $r = $ua->post( $auth_url, 
-    {
-        grant_type => 'client_credentials',
-        client_id => $self->receiver_email,
-        client_secret => $self->token
-    });
+    my $r = $ua->post(
+        $auth_url,
+        {
+            grant_type    => 'client_credentials',
+            client_id     => $self->receiver_email,
+            client_secret => $self->token
+        }
+    );
     die "Couldn't connect to '$auth_url': " . $r->status_line
-                if $r->is_error;
-    
-	my $json = from_json($r->content);
-	my $access_token = $json->{access_token}; 
+      if $r->is_error;
+
+    my $json         = from_json( $r->content );
+    my $access_token = $json->{access_token};
 
     die "Coundn't retried access_token" unless $access_token;
 
-	return $access_token;
+    return $access_token;
 }
 
 sub _build_uri {
-    my ($self, $path, $info) = @_;
-	my $uri = URI->new($self->base_url . $path);
-	return $uri->as_string;
+    my ( $self, $path, $info ) = @_;
+    my $uri = URI->new( $self->base_url . $path );
+    return $uri->as_string;
 }
 
 sub _make_json {
-	my ($self, $info) = @_;
+    my ( $self, $info ) = @_;
 
-	my $items;
-	for my $item (@{ $info->{items} }) {
-		my $item_ref = {
-			id => $item->id,
-			title => $item->description,
-			description => $item->description,
-			quantity => $item->quantity,
-			unit_price => $item->price * 1,
-			currency_id => $self->currency,
-			# picture_url (?)
-			};
-		push (@{$items}, $item_ref );
-	}
+    my $items;
+    for my $item ( @{ $info->{items} } ) {
+        my $item_ref = {
+            id          => $item->id,
+            title       => $item->description,
+            description => $item->description,
+            quantity    => $item->quantity,
+            unit_price  => $item->price * 1,
+            currency_id => $self->currency,
 
-	my $request = {
-		items => $items,
-		external_reference => $info->{payment_id},
-		payer => {
-			name => $info->{buyer}->name,
-			email => $info->{buyer}->email
-		},
-		back_urls => {
-			success => $self->back_url,
-			failure => $self->back_url,
-			pending => $self->back_url
-		}
-	};	
+            # picture_url (?)
+        };
+        push( @{$items}, $item_ref );
+    }
 
-	return to_json($request, {utf8 => 1, pretty => 1});
+    my $request = {
+        items              => $items,
+        external_reference => $info->{payment_id},
+        payer              => {
+            name  => $info->{buyer}->name,
+            email => $info->{buyer}->email
+        },
+        back_urls => {
+            success => $self->back_url,
+            failure => $self->back_url,
+            pending => $self->back_url
+        }
+    };
+
+    return to_json( $request, { utf8 => 1, pretty => 1 } );
 }
 
 sub get_checkout_code {
-    my ($self, $info) = @_;
-	
-	my $ua = $self->user_agent;
-	my $url = $self->_build_uri('/checkout/preferences?access_token=' . $self->access_token);
-	my $json = $self->_make_json($info);
-	
-	my $req = HTTP::Request->new( 'POST', $url );
+    my ( $self, $info ) = @_;
+
+    my $ua  = $self->user_agent;
+    my $url = $self->_build_uri(
+        '/checkout/preferences?access_token=' . $self->access_token );
+    my $json = $self->_make_json($info);
+
+    my $req = HTTP::Request->new( 'POST', $url );
     $req->content_type('application/json');
-	$req->content( $json );
-	my $res = $ua->request($req);
-	
-	die $res->status_line unless $res->is_success;
-	
-	my $content = $res->content;
-	$json = from_json( $content ) ;
-	return $json->{'init_point'};
+    $req->content($json);
+    my $res = $ua->request($req);
+
+    die $res->status_line unless $res->is_success;
+
+    my $content = $res->content;
+    $json = from_json($content);
+    return $json->{'init_point'};
 }
 
 1;
