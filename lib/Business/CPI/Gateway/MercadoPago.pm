@@ -13,10 +13,6 @@ extends 'Business::CPI::Gateway::Base';
 
 # VERSION
 
-has '+checkout_url' =>
-  ( default => sub { 'https://pagseguro.uol.com.br/v2/checkout/payment.html' },
-  );
-
 has '+currency' => ( default => sub { 'BRL' } );
 
 has _base_url => (
@@ -145,7 +141,11 @@ sub get_checkout_code {
 
     my $content = $res->content;
     $json = from_json($content);
-    return $json->{'init_point'};
+
+    my $init_point = $json->{'init_point'};
+
+    $self->checkout_url($init_point);
+    return $init_point;
 }
 
 1;
